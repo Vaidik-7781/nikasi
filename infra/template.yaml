@@ -1,6 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Nikasi core - 15-minute risk engine writing underpass state to DynamoDB (ap-south-1)
+Description: Nikasi core - 15-minute risk engine, read API, alert queue with DLQ (ap-south-1)
+Globals:
+  Function:
+    Runtime: python3.12
+    CodeUri: ../src/
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        STATE_TABLE: !Ref StateTable
 Resources:
   StateTable:
     Type: AWS::DynamoDB::Table
@@ -13,13 +22,34 @@ Resources:
   RiskEngine:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python3.12
       Handler: nikasi.handler.lambda_handler
-      CodeUri: src/
       Timeout: 60
-      Environment: {Variables: {STATE_TABLE: !Ref StateTable}}
       Policies: [{DynamoDBCrudPolicy: {TableName: !Ref StateTable}}]
       Events:
         Every15:
           Type: Schedule
           Properties: {Schedule: rate(15 minutes)}
+  ReadApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: nikasi.api.lambda_handler
+      Policies: [{DynamoDBReadPolicy: {TableName: !Ref StateTable}}]
+      Events:
+        List: {Type: HttpApi, Properties: {Path: /spots, Method: GET}}
+        One: {Type: HttpApi, Properties: {Path: '/spots/{id}', Method: GET}}
+  AlertDLQ:
+    Type: AWS::SQS::Queue
+    Properties: {MessageRetentionPeriod: 1209600, SqsManagedSseEnabled: true}
+  AlertQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 60
+      SqsManagedSseEnabled: true
+      RedrivePolicy: {deadLetterTargetArn: !GetAtt AlertDLQ.Arn, maxReceiveCount: 3}
+Outputs:
+  ApiUrl:
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/spots'
+  StateTableName:
+    Value: !Ref StateTable
+  AlertQueueUrl:
+    Value: !Ref AlertQueue
