@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Nikasi core - 15-minute risk engine, read API, alert queue with DLQ (ap-south-1)
+Parameters:
+  EnableTelegram:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Set true only after creating the Secrets Manager secret nikasi/telegram with keys token and webhook_secret
+Conditions:
+  HasTelegram: !Equals [!Ref EnableTelegram, 'true']
 Globals:
   Function:
     Runtime: python3.12
@@ -24,7 +32,10 @@ Resources:
     Properties:
       Handler: nikasi.handler.lambda_handler
       Timeout: 60
-      Policies: [{DynamoDBCrudPolicy: {TableName: !Ref StateTable}}]
+      Environment: {Variables: {ALERT_QUEUE_URL: !Ref AlertQueue}}
+      Policies:
+        - DynamoDBCrudPolicy: {TableName: !Ref StateTable}
+        - SQSSendMessagePolicy: {QueueName: !GetAtt AlertQueue.QueueName}
       Events:
         Every15:
           Type: Schedule
@@ -46,6 +57,54 @@ Resources:
       VisibilityTimeout: 60
       SqsManagedSseEnabled: true
       RedrivePolicy: {deadLetterTargetArn: !GetAtt AlertDLQ.Arn, maxReceiveCount: 3}
+  SubsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasTelegram
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: chat_id, AttributeType: S}]
+      KeySchema: [{AttributeName: chat_id, KeyType: HASH}]
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+  DedupeTable:
+    Type: AWS::DynamoDB::Table
+    Condition: HasTelegram
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: k, AttributeType: S}]
+      KeySchema: [{AttributeName: k, KeyType: HASH}]
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+      SSESpecification: {SSEEnabled: true}
+  TelegramBot:
+    Type: AWS::Serverless::Function
+    Condition: HasTelegram
+    Properties:
+      Handler: nikasi.telegram_bot.lambda_handler
+      Environment:
+        Variables:
+          SUBS_TABLE: !Ref SubsTable
+          TELEGRAM_TOKEN: '{{resolve:secretsmanager:nikasi/telegram:SecretString:token}}'
+          WEBHOOK_SECRET: '{{resolve:secretsmanager:nikasi/telegram:SecretString:webhook_secret}}'
+      Policies:
+        - DynamoDBReadPolicy: {TableName: !Ref StateTable}
+        - DynamoDBCrudPolicy: {TableName: !Ref SubsTable}
+      Events:
+        Hook: {Type: HttpApi, Properties: {Path: /telegram, Method: POST}}
+  AlertSender:
+    Type: AWS::Serverless::Function
+    Condition: HasTelegram
+    Properties:
+      Handler: nikasi.sender.lambda_handler
+      Environment:
+        Variables:
+          SUBS_TABLE: !Ref SubsTable
+          DEDUPE_TABLE: !Ref DedupeTable
+          TELEGRAM_TOKEN: '{{resolve:secretsmanager:nikasi/telegram:SecretString:token}}'
+      Policies:
+        - DynamoDBReadPolicy: {TableName: !Ref SubsTable}
+        - DynamoDBCrudPolicy: {TableName: !Ref DedupeTable}
+      Events:
+        Alerts: {Type: SQS, Properties: {Queue: !GetAtt AlertQueue.Arn, BatchSize: 5}}
 Outputs:
   ApiUrl:
     Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/spots'
@@ -53,3 +112,6 @@ Outputs:
     Value: !Ref StateTable
   AlertQueueUrl:
     Value: !Ref AlertQueue
+  TelegramWebhookUrl:
+    Condition: HasTelegram
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/telegram'

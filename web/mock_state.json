@@ -1,0 +1,42 @@
+[
+ {
+  "spot_id": "minto-bridge",
+  "name": "Minto Bridge underpass",
+  "state": "CAUTION",
+  "act_as": "CAUTION",
+  "reasons": [
+   "load 9.1 mm vs no-go at 8.0 mm",
+   "known flood spot"
+  ],
+  "minutes_to_no_go": 30,
+  "updated_at": "2026-10-09T06:00:00+00:00",
+  "lat": 28.633,
+  "lon": 77.22
+ },
+ {
+  "spot_id": "pul-prahladpur",
+  "name": "Pul Prahladpur underpass",
+  "state": "GO",
+  "act_as": "GO",
+  "reasons": [
+   "load 1.0 mm"
+  ],
+  "minutes_to_no_go": null,
+  "updated_at": "2026-10-09T06:00:00+00:00",
+  "lat": 28.4994,
+  "lon": 77.2994
+ },
+ {
+  "spot_id": "zakhira",
+  "name": "Zakhira underpass",
+  "state": "UNKNOWN",
+  "act_as": "NO-GO",
+  "reasons": [
+   "weather data is 70 min old"
+  ],
+  "minutes_to_no_go": null,
+  "updated_at": "2026-10-09T06:00:00+00:00",
+  "lat": 28.6573,
+  "lon": 77.1423
+ }
+]

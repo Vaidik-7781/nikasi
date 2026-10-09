@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nikasi: is this underpass safe right now?</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Nikasi</h1>
+  <p class="sub">Delhi underpasses: go, caution or no-go, from rain and terrain.</p>
+  <p id="banner" role="status"></p>
+</header>
+<main>
+  <div id="map" aria-label="Map of underpasses"></div>
+  <ul id="cards" aria-live="polite"></ul>
+</main>
+<footer>
+  Guidance, not a guarantee: if water is on the road, do not enter. Missing or old data shows as UNKNOWN and means NO-GO.
+  Data: Open-Meteo (CC BY 4.0), Copernicus DEM, &copy; OpenStreetMap contributors.
+</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
