@@ -37,6 +37,22 @@
     });
   }
 
+  var latest = [];
+  function km(a, b, c, d) { var r = Math.PI / 180, p = (c - a) * r, q = (d - b) * r, h = Math.sin(p / 2) * Math.sin(p / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(q / 2) * Math.sin(q / 2); return 12742 * Math.asin(Math.sqrt(h)); }
+  // Location stays in the browser: it is used once to pick the nearest spot and is never sent anywhere.
+  document.getElementById("near").addEventListener("click", function () {
+    var out = document.getElementById("near-out");
+    if (!navigator.geolocation) { out.textContent = "Location is not available on this device."; return; }
+    navigator.geolocation.getCurrentPosition(function (p) {
+      var best = null;
+      latest.forEach(function (s) { if (s.lat != null) { var d = km(p.coords.latitude, p.coords.longitude, Number(s.lat), Number(s.lon)); if (!best || d < best.d) best = {s: s, d: d}; } });
+      if (!best) { out.textContent = "No spots loaded yet."; return; }
+      var e = effective(best.s);
+      out.textContent = best.s.name + " (" + best.d.toFixed(1) + " km): " + (e.state === "UNKNOWN" ? "UNKNOWN, treat as NO-GO" : e.act);
+      map.flyTo([Number(best.s.lat), Number(best.s.lon)], 15);
+    }, function () { out.textContent = "Could not get your location."; });
+  });
+
   var demo = !window.NIKASI_API;
   document.getElementById("banner").textContent = demo ? "DEMO DATA: set the API URL in config.js" : "";
   function load() {
@@ -46,7 +62,7 @@
         var spots = Array.isArray(d) ? d : d.spots;
         if (demo) spots.forEach(function (s) { s.updated_at = new Date(Date.now() - 3 * 60000).toISOString(); }); // demo rows look fresh, except the stale one
         if (demo) spots.forEach(function (s) { if (s.spot_id === "zakhira") s.updated_at = new Date(Date.now() - 70 * 60000).toISOString(); });
-        render(spots);
+        latest = spots; render(spots);
       })
       .catch(function () {
         document.getElementById("banner").textContent = "Cannot reach the server. Treat every underpass as NO-GO.";
@@ -54,3 +70,5 @@
   }
   load(); setInterval(load, 60000);
 })();
+
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
