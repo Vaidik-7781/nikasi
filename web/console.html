@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nikasi ward console</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Ward console</h1>
+  <p class="sub">Review the proposed barricade list. Nothing is sent until you approve it.</p>
+  <p id="who" role="status"></p>
+</header>
+<main style="display:block;max-width:720px">
+  <p><a id="login" href="#">Sign in</a></p>
+  <section id="panel" hidden>
+    <pre id="list" style="white-space:pre-wrap;background:var(--card);padding:14px;border-radius:12px"></pre>
+    <button id="approve" type="button" disabled>Approve this list</button> <button id="reload" type="button">Reload</button>
+    <p id="msg" role="status"></p>
+  </section>
+</main>
+<script src="config.js"></script>
+<script src="console.js"></script>
+</body>
+</html>

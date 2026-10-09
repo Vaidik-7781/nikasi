@@ -28,8 +28,9 @@ Stale or missing data shows as UNKNOWN and is treated as NO-GO.
 ## Status (honest)
 | Piece | State |
 |---|---|
-| Risk engine, templates, agent graph, API, Telegram bot, sender, web app | written, 36+ unit tests pass, not yet run on real AWS |
+| Risk engine, templates, agent graph, API, Telegram bot, sender, web app | written, 41+ unit tests pass, not yet run on real AWS |
 | Real data scripts (OSM, DEM), backtest | written, never run against live data |
+| Ward console (Cognito login, human approval), alarms, API throttling | written and tested locally, not deployed |
 | Deployed on AWS | not yet; see `docs/DEPLOY.md` |
 | Spots | 3 seed spots with approximate coordinates |
 

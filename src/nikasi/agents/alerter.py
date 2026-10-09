@@ -47,3 +47,22 @@ def bedrock_llm(model_id: str | None = None, guardrail_id: str | None = None):
                                      "guardrailVersion": os.environ.get("GUARDRAIL_VERSION", "DRAFT")}
         return rt.converse(**kw)["output"]["message"]["content"][0]["text"]
     return call
+
+def strands_llm(model_id: str | None = None, guardrail_id: str | None = None):
+    """Same job through the open-source Strands Agents SDK (AWS). UNTESTED against a live model.
+    Returns None if the SDK or a model id is missing. Install: pip install strands-agents."""
+    model_id = model_id or os.environ.get("BEDROCK_MODEL_ID")
+    if not model_id:
+        return None
+    try:
+        from strands import Agent
+        from strands.models import BedrockModel
+    except ImportError:
+        return None
+    guardrail_id = guardrail_id or os.environ.get("GUARDRAIL_ID")
+    kw = {"model_id": model_id}
+    if guardrail_id:
+        kw.update(guardrail_id=guardrail_id, guardrail_version=os.environ.get("GUARDRAIL_VERSION", "DRAFT"))
+    agent = Agent(model=BedrockModel(**kw), tools=[],
+                  system_prompt="You reword flood alerts. Keep the first word and every number exactly. Never claim anything is safe.")
+    return lambda prompt: str(agent(prompt))

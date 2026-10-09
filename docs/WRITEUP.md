@@ -18,6 +18,8 @@ Every monsoon, Delhi underpasses such as Minto Bridge fill with water within min
 | Read API | API Gateway (HTTP) + Lambda |
 | Web app | S3 + CloudFront (private bucket, origin access control) |
 | Alerts | SQS with dead-letter queue -> Lambda sender -> Telegram; Secrets Manager for the bot token |
+| Ward console | Cognito JWT authorizer, Lambda, DynamoDB dispatch log |
+| Alarms | CloudWatch alarms -> SNS |
 | Agent graph | Sentinel -> Verifier -> Alerter -> Dispatcher in Python; Amazon Bedrock with Guardrails can reword alerts |
 | Infra as code | AWS SAM (`infra/template.yaml`) |
 
@@ -37,4 +39,4 @@ Telegram stores only a chat id and three spot ids for 24 hours. Location is used
 Claude (Anthropic) assisted with planning and writing code and tests. [Add any other tool you used.]
 
 ## Run it
-`docs/DEPLOY.md`. Tests: `pytest` (36+).
+`docs/DEPLOY.md`. Tests: `pytest` (41+).

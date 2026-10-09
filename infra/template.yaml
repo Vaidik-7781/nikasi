@@ -7,7 +7,12 @@ Parameters:
     Default: 'false'
     AllowedValues: ['true', 'false']
     Description: Set true only after creating the Secrets Manager secret nikasi/telegram with keys token and webhook_secret
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: Optional email for alarm notifications (confirm the SNS subscription email)
 Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
   HasTelegram: !Equals [!Ref EnableTelegram, 'true']
 Globals:
   Function:
@@ -46,8 +51,8 @@ Resources:
       Handler: nikasi.api.lambda_handler
       Policies: [{DynamoDBReadPolicy: {TableName: !Ref StateTable}}]
       Events:
-        List: {Type: HttpApi, Properties: {Path: /spots, Method: GET}}
-        One: {Type: HttpApi, Properties: {Path: '/spots/{id}', Method: GET}}
+        List: {Type: HttpApi, Properties: {ApiId: !Ref NikasiApi, Path: /spots, Method: GET}}
+        One: {Type: HttpApi, Properties: {ApiId: !Ref NikasiApi, Path: '/spots/{id}', Method: GET}}
   AlertDLQ:
     Type: AWS::SQS::Queue
     Properties: {MessageRetentionPeriod: 1209600, SqsManagedSseEnabled: true}
@@ -89,7 +94,7 @@ Resources:
         - DynamoDBReadPolicy: {TableName: !Ref StateTable}
         - DynamoDBCrudPolicy: {TableName: !Ref SubsTable}
       Events:
-        Hook: {Type: HttpApi, Properties: {Path: /telegram, Method: POST}}
+        Hook: {Type: HttpApi, Properties: {ApiId: !Ref NikasiApi, Path: /telegram, Method: POST}}
   AlertSender:
     Type: AWS::Serverless::Function
     Condition: HasTelegram
@@ -105,6 +110,98 @@ Resources:
         - DynamoDBCrudPolicy: {TableName: !Ref DedupeTable}
       Events:
         Alerts: {Type: SQS, Properties: {Queue: !GetAtt AlertQueue.Arn, BatchSize: 5}}
+  NikasiApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+      DefaultRouteSettings: {ThrottlingBurstLimit: 20, ThrottlingRateLimit: 10}
+      Auth:
+        Authorizers:
+          WardAuth:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${WardPool}'
+              audience: [!Ref WardClient]
+  WardPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AdminCreateUserConfig: {AllowAdminCreateUserOnly: true}
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      Policies: {PasswordPolicy: {MinimumLength: 12}}
+  WardClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref WardPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [implicit]
+      AllowedOAuthScopes: [openid, email]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Sub 'https://${WebDistribution.DomainName}/console.html']
+      LogoutURLs: [!Sub 'https://${WebDistribution.DomainName}/console.html']
+  WardDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref WardPool
+      Domain: !Sub '${AWS::StackName}-ward-${AWS::AccountId}'
+  DispatchTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{AttributeName: id, AttributeType: S}]
+      KeySchema: [{AttributeName: id, KeyType: HASH}]
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+  WardOps:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: nikasi.ops.lambda_handler
+      Environment: {Variables: {DISPATCH_TABLE: !Ref DispatchTable}}
+      Policies:
+        - DynamoDBReadPolicy: {TableName: !Ref StateTable}
+        - DynamoDBCrudPolicy: {TableName: !Ref DispatchTable}
+      Events:
+        Get: {Type: HttpApi, Properties: {ApiId: !Ref NikasiApi, Path: /dispatch, Method: GET, Auth: {Authorizer: WardAuth}}}
+        Approve: {Type: HttpApi, Properties: {ApiId: !Ref NikasiApi, Path: /dispatch/approve, Method: POST, Auth: {Authorizer: WardAuth}}}
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties: {KmsMasterKeyId: alias/aws/sns}
+  AlarmSub:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlarmEmail
+    Properties: {TopicArn: !Ref AlarmTopic, Protocol: email, Endpoint: !Ref AlarmEmail}
+  DlqAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: An alert could not be delivered after 3 tries
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions: [{Name: QueueName, Value: !GetAtt AlertDLQ.QueueName}]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+  EngineErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The 15-minute risk engine is failing, so states will go UNKNOWN
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref RiskEngine}]
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
   WebBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -144,15 +241,23 @@ Resources:
             Condition: {StringEquals: {'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebDistribution}'}}
 Outputs:
   ApiUrl:
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/spots'
+    Value: !Sub 'https://${NikasiApi}.execute-api.${AWS::Region}.amazonaws.com/spots'
   StateTableName:
     Value: !Ref StateTable
   AlertQueueUrl:
     Value: !Ref AlertQueue
   TelegramWebhookUrl:
     Condition: HasTelegram
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/telegram'
+    Value: !Sub 'https://${NikasiApi}.execute-api.${AWS::Region}.amazonaws.com/telegram'
   WebUrl:
     Value: !Sub 'https://${WebDistribution.DomainName}'
   WebBucketName:
     Value: !Ref WebBucket
+  ConsoleUrl:
+    Value: !Sub 'https://${WebDistribution.DomainName}/console.html'
+  WardLoginDomain:
+    Value: !Sub '${AWS::StackName}-ward-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com'
+  WardClientId:
+    Value: !Ref WardClient
+  WardPoolId:
+    Value: !Ref WardPool

@@ -7,6 +7,10 @@
 5. Open the printed WEB URL. First data appears within 15 minutes, or run the Lambda once with the printed command.
 6. Set an AWS Budget alert (Billing, Budgets) before leaving it running.
 
+## Ward console
+After deploy, `deploy.sh` prints a CONSOLE URL and the command to create a ward user (email login, admin-created only). Sign in, review the proposed list, approve.
+Optional: `PARAMS="AlarmEmail=you@example.com" bash scripts/deploy.sh` for alarm emails (confirm the subscription mail).
+
 ## Optional: Telegram alerts
 1. In Telegram, talk to @BotFather, create a bot, copy the token.
 2. Secrets Manager, new secret named `nikasi/telegram`, JSON: `{"token":"<bot token>","webhook_secret":"<long random string>"}`.

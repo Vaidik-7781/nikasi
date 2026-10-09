@@ -20,7 +20,7 @@ def lambda_handler(event, context, table=None, fetch=weather.fetch, sqs=None):
         import boto3
         sqs = boto3.client("sqs")
     try:
-        llm = alerter.bedrock_llm()
+        llm = alerter.strands_llm() or alerter.bedrock_llm()
     except Exception:
         llm = None
     now = datetime.now(timezone.utc)
