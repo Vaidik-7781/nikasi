@@ -1,0 +1,9 @@
+{
+  "city": "Delhi",
+  "note": "Coordinates are APPROXIMATE seeds. scripts/osm_underpasses.py snaps them to real OSM ways; verify before the demo.",
+  "spots": [
+    {"id": "minto-bridge", "name": "Minto Bridge underpass", "lat": 28.6330, "lon": 77.2200, "known_flood_spot": true, "pocket_depth_m": null},
+    {"id": "pul-prahladpur", "name": "Pul Prahladpur underpass", "lat": 28.4994, "lon": 77.2994, "known_flood_spot": true, "pocket_depth_m": null},
+    {"id": "zakhira", "name": "Zakhira underpass", "lat": 28.6573, "lon": 77.1423, "known_flood_spot": true, "pocket_depth_m": null}
+  ]
+}

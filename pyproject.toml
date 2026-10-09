@@ -1,0 +1,13 @@
+[project]
+name = "nikasi"
+version = "0.1.0"
+description = "Underpass go/no-go for monsoon flooding, built for WeMakeDevs x AWS Environmental Hacks (Oct 2026)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+geo = ["rasterio", "numpy", "boto3"]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
