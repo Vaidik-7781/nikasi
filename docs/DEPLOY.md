@@ -3,7 +3,7 @@
 1. Use a standalone AWS account (not one under an organisation policy that blocks DynamoDB, SQS or S3).
 2. Open CloudShell, region Mumbai (ap-south-1).
 3. `git clone https://github.com/Vaidik-7781/nikasi && cd nikasi`
-4. `pip install --user aws-sam-cli && bash scripts/deploy.sh`
+4. `bash scripts/deploy.sh` (installs the SAM CLI if missing)
 5. Open the printed WEB URL. First data appears within 15 minutes, or run the Lambda once with the printed command.
 6. Set an AWS Budget alert (Billing, Budgets) before leaving it running.
 

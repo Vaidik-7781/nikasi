@@ -3,8 +3,10 @@
 # Needs: aws cli, sam cli (pip install aws-sam-cli). Telegram stays off until you set the secret (docs/DEPLOY.md).
 set -euo pipefail
 STACK=${STACK:-nikasi}; REGION=${REGION:-ap-south-1}
-sam build -t infra/template.yaml
-sam deploy --stack-name "$STACK" --region "$REGION" --resolve-s3 --capabilities CAPABILITY_IAM \
+# Pure-Python functions with no dependencies: skip `sam build` (CloudShell's python may not match the Lambda runtime).
+command -v sam >/dev/null || pip install --user aws-sam-cli
+export PATH="$HOME/.local/bin:$PATH"
+sam deploy -t infra/template.yaml --stack-name "$STACK" --region "$REGION" --resolve-s3 --capabilities CAPABILITY_IAM \
   --no-confirm-changeset --no-fail-on-empty-changeset ${PARAMS:+--parameter-overrides $PARAMS}
 out() { aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
   --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
