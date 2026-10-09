@@ -4,7 +4,8 @@ from __future__ import annotations
 import json, os, time
 from datetime import datetime, timezone
 from .risk import Spot, assess
-from . import weather, templates
+from . import weather
+from .agents import graph, alerter
 
 def _spots() -> list[dict]:
     path = os.path.join(os.path.dirname(__file__), "spots.json")
@@ -18,6 +19,10 @@ def lambda_handler(event, context, table=None, fetch=weather.fetch, sqs=None):
     if queue_url and sqs is None:
         import boto3
         sqs = boto3.client("sqs")
+    try:
+        llm = alerter.bedrock_llm()
+    except Exception:
+        llm = None
     now = datetime.now(timezone.utc)
     out = []
     for s in _spots():
@@ -27,10 +32,12 @@ def lambda_handler(event, context, table=None, fetch=weather.fetch, sqs=None):
         item = {"spot_id": spot.id, "name": spot.name, "lat": s["lat"], "lon": s["lon"], "state": a.state, "act_as": a.act_as,
                 "reasons": a.reasons, "minutes_to_no_go": a.minutes_to_no_go,
                 "updated_at": now.isoformat(), "ttl": int(time.time()) + 3600}
+        res = graph.process(prev, item, llm)
+        item = res["item"]
         table.put_item(Item=json.loads(json.dumps(item), parse_float=str))
-        if sqs and queue_url and prev and prev.get("act_as") != a.act_as:
-            sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(
-                {"spot_id": spot.id, "text": templates.render(item),
-                 "dedupe_id": f"{spot.id}:{a.act_as}:{now:%Y%m%d%H%M}"}))
         out.append(item)
+        if res["alert"] and sqs and queue_url:
+            sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(
+                {"spot_id": spot.id, "text": res["alert"]["text"],
+                 "dedupe_id": f"{spot.id}:{item['act_as']}:{now:%Y%m%d%H%M}"}))
     return {"count": len(out)}
