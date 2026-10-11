@@ -9,5 +9,6 @@ jobs:
         with: {python-version: '3.12'}
       - run: pip install pytest cfn-lint
       - run: pytest -q
+      - run: PYTHONPATH=src python -m nikasi.replay
       - run: cfn-lint infra/template.yaml
       - run: node --check web/app.js && node --check web/console.js && node --check web/sw.js

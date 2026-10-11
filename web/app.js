@@ -1,8 +1,13 @@
 (function () {
   var STALE_MIN = 45, COLORS = {GO: "#2e9e5b", CAUTION: "#e0a100", "NO-GO": "#d64545", UNKNOWN: "#7b5ea7"};
-  var map = L.map("map").setView([28.6139, 77.209], 11);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"}).addTo(map);
-  var markers = {};
+  // The map is a nice-to-have. If its library or tiles fail (offline, blocked CDN) the safety cards still work.
+  var map = null, markers = {};
+  try {
+    if (window.L) {
+      map = L.map("map").setView([28.6139, 77.209], 11);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"}).addTo(map);
+    } else { document.getElementById("map").style.display = "none"; }
+  } catch (err) { map = null; document.getElementById("map").style.display = "none"; }
 
   // Fail safe on the client too: old or malformed rows become UNKNOWN, which acts as NO-GO.
   function effective(s) {
@@ -29,7 +34,7 @@
       li.appendChild(el("p", "why", e.why));
       list.appendChild(li);
       var shown = e.state === "UNKNOWN" ? "UNKNOWN" : e.act;
-      if (s.lat != null && s.lon != null) {
+      if (map && s.lat != null && s.lon != null) {
         if (markers[s.spot_id]) map.removeLayer(markers[s.spot_id]);
         markers[s.spot_id] = L.circleMarker([s.lat, s.lon], {radius: 11, color: "#fff", weight: 2, fillColor: COLORS[shown], fillOpacity: 1})
           .addTo(map).bindTooltip(s.name + ": " + shown);
@@ -49,12 +54,13 @@
       if (!best) { out.textContent = "No spots loaded yet."; return; }
       var e = effective(best.s);
       out.textContent = best.s.name + " (" + best.d.toFixed(1) + " km): " + (e.state === "UNKNOWN" ? "UNKNOWN, treat as NO-GO" : e.act);
-      map.flyTo([Number(best.s.lat), Number(best.s.lon)], 15);
+      if (map) map.flyTo([Number(best.s.lat), Number(best.s.lon)], 15);
     }, function () { out.textContent = "Could not get your location."; });
   });
 
   var demo = !window.NIKASI_API;
-  document.getElementById("banner").textContent = demo ? "DEMO DATA: set the API URL in config.js" : "";
+  var sim = !!window.NIKASI_SIM;
+  document.getElementById("banner").textContent = sim ? "SIMULATION: scripted storm, not real rain" : demo ? "DEMO DATA: set the API URL in config.js" : "";
   function load() {
     var url = demo ? "mock_state.json" : window.NIKASI_API;
     fetch(url, {cache: "no-store"}).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -68,7 +74,7 @@
         document.getElementById("banner").textContent = "Cannot reach the server. Treat every underpass as NO-GO.";
       });
   }
-  load(); setInterval(load, 60000);
+  load(); setInterval(load, sim ? 3000 : 60000);
 })();
 
 if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }

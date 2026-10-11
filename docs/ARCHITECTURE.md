@@ -25,5 +25,7 @@ flowchart LR
 4. A dispatch list cannot be sent without a named approver, taken from the verified token, and approval is rejected if conditions changed since the person looked.
 5. Telegram keeps a chat id and 3 spot ids for 24 h; `/stop` erases; location is not stored.
 
+See also: [SAFETY_CASE.md](SAFETY_CASE.md) for the failure modes and tests.
+
 ## Not built
 Multi-city, photo reports, route-level check, SACHET/IMD alert feed, real sending of an approved dispatch list (it is recorded, not transmitted).

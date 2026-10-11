@@ -12,6 +12,6 @@ def render(item: dict) -> str:
         return f"NO-GO: {name}. Water is likely. Take another route. [{why}]"
     if act == "CAUTION":
         tail = f" Expected NO-GO in about {eta} min." if eta else ""
-        return f"CAUTION: {name}. Rain is building.{tail} [{why}]"
+        return f"CAUTION: {name}. Flood risk is elevated.{tail} [{why}]"
     tail = f" Could turn NO-GO in about {eta} min." if eta else ""
     return f"GO: {name} looks clear right now.{tail}"
